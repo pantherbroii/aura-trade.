@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, BarChart3, X } from 'lucide-react';
 import auraLogo from './assets/logo.png'; 
 
 const MiniChart = ({ data, color }) => {
@@ -29,6 +29,7 @@ export default function App() {
   const [prices, setPrices] = useState({ BTC: 0, SOL: 0, ETH: 0, BNB: 0, ADA: 0, DOGE: 0, HULKY: 0.000185 });
   const [history, setHistory] = useState({ BTC: [], SOL: [], ETH: [], BNB: [], ADA: [], DOGE: [], HULKY: [] });
   const [tradeInputs, setTradeInputs] = useState({ BTC: 1000, SOL: 1000, ETH: 1000, BNB: 1000, ADA: 1000, DOGE: 1000, HULKY: 1000 });
+  const [activeChart, setActiveChart] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('aura_cash', JSON.stringify(cash));
@@ -51,7 +52,6 @@ export default function App() {
         }
       });
 
-      // HULKY Random Digit Jitter
       const start = new Date("2026-02-10T00:00:00");
       const progress = Math.min(1, Math.max(0, (new Date() - start) / (30 * 24 * 60 * 60 * 1000)));
       const base = 0.0001 + (0.10 - 0.0001) * Math.pow(progress, 2);
@@ -90,6 +90,15 @@ export default function App() {
     }
   };
 
+  const getChartUrl = (symbol) => {
+    if (symbol === 'HULKY') {
+      // Direct DexScreener Embed for HULKY
+      return "https://dexscreener.com/solana/7u9p5t4u5u5u5u5u5u5u5u5u5u5u5u5u5u5u5u5u?embed=1&theme=dark&trades=0&info=0";
+    }
+    // TradingView for Major Coins
+    return `https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76d4d&symbol=${symbol}USDT&interval=D&hidesidetoolbar=1&symboledit=1&saveimage=1&toolbarbg=f1f3f6&studies=[]&theme=dark&style=1&timezone=Etc%2FUTC`;
+  };
+
   return (
     <div style={{ backgroundColor: '#0b0e14', color: 'white', minHeight: '100vh', width: '100vw', padding: '20px', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif', boxSizing: 'border-box' }}>
       
@@ -126,23 +135,35 @@ export default function App() {
         {Object.keys(prices).map(t => {
           const isH = t === 'HULKY';
           const prof = (holdings[t] * prices[t]) - (invested[t] || 0);
+          const isChartOpen = activeChart === t;
+
           return (
-            <div key={t} style={{ background: isH ? 'linear-gradient(135deg, #161b22 0%, #064e3b 100%)' : '#161b22', borderRadius: '16px', border: isH ? '2px solid #22c55e' : '1px solid #30363d', padding: '20px', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 'bold', color: isH ? '#22c55e' : '#f8fafc' }}>{t} / USDT</span>
-                <span style={{ color: prof >= 0 ? '#3fb950' : '#f85149', fontWeight: 'bold' }}>{prof >= 0 ? '+' : ''}{prof.toFixed(2)}</span>
-              </div>
-              <div style={{ fontSize: '2.1rem', fontWeight: '900', margin: '10px 0', fontFamily: 'monospace' }}>
-                ${prices[t] < 1 ? prices[t].toFixed(8) : prices[t].toLocaleString(undefined, {minimumFractionDigits: 2})}
-              </div>
+            <div key={t} style={{ background: isH ? 'linear-gradient(135deg, #161b22 0%, #064e3b 100%)' : '#161b22', borderRadius: '16px', border: isH ? '2px solid #22c55e' : '1px solid #30363d', padding: '20px', display: 'flex', flexDirection: 'column', position: 'relative' }}>
               
-              <MiniChart data={history[t]} color={isH ? '#22c55e' : '#6366f1'} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 'bold', color: isH ? '#22c55e' : '#f8fafc' }}>{t} / USDT</span>
+                <button onClick={() => setActiveChart(isChartOpen ? null : t)} style={{ background: 'transparent', border: 'none', color: '#8b949e', cursor: 'pointer' }}>
+                  {isChartOpen ? <X size={20} /> : <BarChart3 size={20} />}
+                </button>
+              </div>
+
+              {isChartOpen ? (
+                <div style={{ height: '200px', marginTop: '15px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #30363d' }}>
+                  <iframe src={getChartUrl(t)} style={{ width: '100%', height: '100%', border: 'none' }} title="Chart" />
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: '2.1rem', fontWeight: '900', margin: '10px 0', fontFamily: 'monospace' }}>
+                    ${prices[t] < 1 ? prices[t].toFixed(8) : prices[t].toLocaleString(undefined, {minimumFractionDigits: 2})}
+                  </div>
+                  <MiniChart data={history[t]} color={isH ? '#22c55e' : '#6366f1'} />
+                </>
+              )}
 
               <div style={{ marginTop: '15px' }}>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
                   <input type="number" value={tradeInputs[t]} onChange={(e) => setTradeInputs({...tradeInputs, [t]: e.target.value})} style={{ flex: 1, background: '#0d1117', border: '1px solid #30363d', color: 'white', padding: '10px', borderRadius: '8px' }} />
                   <button onClick={() => handleBuy(t)} style={{ background: isH ? '#22c55e' : '#6366f1', color: 'white', border: 'none', padding: '0 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>BUY</button>
-                  {/* FIXED SELL BUTTON: Always Rendered */}
                   <button onClick={() => handleSell(t)} style={{ background: (holdings[t] > 0) ? '#f85149' : '#30363d', color: 'white', border: 'none', padding: '0 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>SELL</button>
                 </div>
                 {holdings[t] > 0 && <div style={{ fontSize: '0.65rem', color: '#8b949e' }}>Balance: {holdings[t].toFixed(2)} {t}</div>}
